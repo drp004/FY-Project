@@ -1,0 +1,11 @@
+# Local venv (never push to GitHub)
+venv/
+.venv/
+
+# Secrets file (set on Render dashboard)
+.env
+
+# Caches
+__pycache__/
+*.pyc
+*.pyo
