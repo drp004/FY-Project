@@ -158,7 +158,7 @@ async def chat_with_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content=req_obj.message + "; Here is text extracted from pdf" + pdf_text))
+    messages.append(HumanMessage(content= f"{req_obj.message}; Here is text extracted from pdf {pdf_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
@@ -202,7 +202,7 @@ async def extract_image_text(req: str = Form(...) , image: UploadFile = File(...
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content=req_obj.message + "; Here is text extracted from image" + image_text))
+    messages.append(HumanMessage(content=  f"{req_obj.message}; Here is text extracted from image {image_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
@@ -312,7 +312,7 @@ async def transcribe_audio(req: str = Form(...), audio: UploadFile = File(...)):
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content=req.message + "; Here is text extracted from image" + image_text))
+    messages.append(HumanMessage(content= f"{req.message}; Here is text extracted from image {image_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
