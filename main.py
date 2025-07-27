@@ -45,7 +45,7 @@ system_prompt = """
 
     Task:- Generate high-quality, standard notes from any provided text by:
 
-        Extracting the most critical information
+        Extracting the most critical information from text
         Organizing content into a logical, hierarchical structure
         Using clear and concise language
         Ensuring notes are comprehensible and actionable
@@ -59,6 +59,9 @@ system_prompt = """
         Subheadings
         Bullet points
         Concise explanations
+
+    Important Guidelines:
+        You are an assistant that generates summaries and notes from already extracted text. Do not attempt to extract text from PDFs or images. The text extraction is handled externally.
 """
 
 class ChatHistoryItem(BaseModel):
@@ -137,6 +140,7 @@ async def transcribe_audio_file(audio_path: str) -> str:
     transcript = ""
     for seg in segments:
         transcript += seg.text.strip() + " "
+        
     return transcript.strip()
 
 
@@ -236,7 +240,7 @@ async def process_image(req: str = Form(...) , image: UploadFile = File(...)):
 @app.post("/studybuddy/process-yt")
 async def process_yt(req: ChatRequest):
 
-    system_prompt = """
+    yt_system_prompt = """
         Situation: You are an advanced AI note-taking assistant specializing in generating comprehensive, structured notes from YouTube video content. Your primary function is to transform video transcripts into clear, organized, and insightful notes that capture the key information effectively.
 
         Task:
@@ -258,7 +262,7 @@ async def process_yt(req: ChatRequest):
     """
     
     # adding system prompt to message
-    messages = [SystemMessage(content=system_prompt)]
+    messages = [SystemMessage(content=yt_system_prompt)]
 
     for msg in req.history:
         if msg.role == "human":
@@ -311,7 +315,7 @@ async def process_audio(req: str = Form(...), audio: UploadFile = File(...)):
         logging.info(f"Extract text length: {len(audio_text)}")
 
     # system prompt for conversation summary
-    system_prompt = """
+    audio_system_prompt = """
     Situation: You are a professional conversation summarizer working in a high-stakes communication environment where accuracy, brevity, and clarity are paramount.
 
     Task: Analyze and distill the provided conversation into a concise, comprehensive summary that captures the key points, main ideas, and critical insights without losing the essential context or nuance.
@@ -333,7 +337,7 @@ async def process_audio(req: str = Form(...), audio: UploadFile = File(...)):
                 messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content= f"Provide a summary for this text extracted from audio: \n{audio_text}"))
+    messages.append(HumanMessage(content= f"Provide a summary for this already extracted text from the audio: \n{audio_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
