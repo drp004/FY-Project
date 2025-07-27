@@ -59,9 +59,6 @@ system_prompt = """
         Subheadings
         Bullet points
         Concise explanations
-
-    Additional Guidelines:
-        You don't need to call any tool for extract the text from PDF or Image
 """
 
 class ChatHistoryItem(BaseModel):
@@ -168,7 +165,7 @@ async def process_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content= f"{req_obj.message}; Here is extracted text from pdf, generate notes from this: \n{pdf_text}"))
+    messages.append(HumanMessage(content= f"Here is the text, generate notes from this: \n{pdf_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
@@ -215,7 +212,7 @@ async def process_image(req: str = Form(...) , image: UploadFile = File(...)):
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content=  f"{req_obj.message}; Here is extracted text from image, generate notes from this: \n{image_text}"))
+    messages.append(HumanMessage(content= f"Here is the text, generate notes from this: \n{image_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
@@ -336,7 +333,7 @@ async def process_audio(req: str = Form(...), audio: UploadFile = File(...)):
                 messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content= f"{req.get('message', '')}; Provide a summary for this text extracted from audio: \n{audio_text}"))
+    messages.append(HumanMessage(content= f"Provide a summary for this text extracted from audio: \n{audio_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
