@@ -137,7 +137,7 @@ def transcribe_audio_file(audio_path: str) -> str:
 # === Routes === #
 
 # === Route for pdf note generation === #
-@app.post("/studuybuddy/process-pdf")
+@app.post("/studybuddy/process-pdf")
 async def chat_with_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
 
     # Parse JSON string
@@ -179,7 +179,7 @@ async def chat_with_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
     }
 
 # === Route for image note generation === #
-@app.post("/studuybuddy/process-image")
+@app.post("/studybuddy/process-image")
 async def extract_image_text(req: str = Form(...) , image: UploadFile = File(...)):
 
     # Parse JSON string
@@ -223,7 +223,7 @@ async def extract_image_text(req: str = Form(...) , image: UploadFile = File(...
     }
 
 # === Route for yt note generation === #
-@app.post("/studuybuddy/process-yt")
+@app.post("/studybuddy/process-yt")
 async def extract_yt_transcript(req: ChatRequest):
 
     system_prompt = """
@@ -275,7 +275,7 @@ async def extract_yt_transcript(req: ChatRequest):
     }
 
 # === Route for audio summaries === #
-@app.post("/studuybuddy/process-audio")
+@app.post("/studybuddy/process-audio")
 async def transcribe_audio(req: str = Form(...), audio: UploadFile = File(...)):
     """
     Accepts a JSON string in `req` + uploaded audio file.
