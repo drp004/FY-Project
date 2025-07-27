@@ -4,6 +4,12 @@ from pydantic import BaseModel
 from typing import List, Optional
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
 
+import traceback
+import logging
+
+# logger for debugging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # for pdf process
 import fitz
@@ -53,6 +59,9 @@ system_prompt = """
         Subheadings
         Bullet points
         Concise explanations
+
+    Additional Guidelines:
+        You don't need to call any tool for this to extract the text from PDF or Image
 """
 
 class ChatHistoryItem(BaseModel):
@@ -68,7 +77,7 @@ class Yt_link(BaseModel):
 
 
 # === Pdf proccesing tool === #
-def extract_pdf_text(file: UploadFile) -> str:
+async def extract_pdf_text(file: UploadFile) -> str:
     pdf_bytes = file.file.read()
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     text = "\n".join([page.get_text() for page in doc])
@@ -76,7 +85,7 @@ def extract_pdf_text(file: UploadFile) -> str:
     return text
 
 # === image processing tool === #
-def extract_image_text(image_bytes):
+async def extract_image_text(image_bytes):
     """
     Process image bytes and extract text
     """
@@ -92,10 +101,10 @@ def extract_image_text(image_bytes):
         return text
 
     except Exception as e:
-        raise Exception(f"Error processing image: {str(e)}")
+        raise Exception(f"Error processing image: {str(e)}, \ntraceback: {traceback.format_exc()}")
     
 # === YouTube video processor === #
-def transcribe_yt(url):
+async def transcribe_yt(url):
     # Parse the URL to extract its components
     parsed_url = urlparse(url)
 
@@ -125,7 +134,7 @@ def transcribe_yt(url):
 
 # load the model once
 model = WhisperModel("tiny", device="cpu", compute_type="int8")
-def transcribe_audio_file(audio_path: str) -> str:
+async def transcribe_audio_file(audio_path: str) -> str:
     segments, info = model.transcribe(audio_path)
 
     transcript = ""
@@ -138,7 +147,7 @@ def transcribe_audio_file(audio_path: str) -> str:
 
 # === Route for pdf note generation === #
 @app.post("/studybuddy/process-pdf")
-async def chat_with_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
+async def process_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
 
     # Parse JSON string
     req_dict = json.loads(req)
@@ -146,7 +155,8 @@ async def chat_with_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
 
     # extract text from pdf
     if pdf:
-        pdf_text = extract_pdf_text(pdf)
+        pdf_text = await extract_pdf_text(pdf)
+        logging.info(f"Extracted text length: {len(pdf_text)}, \nTraceback: {traceback.format_exc()}")
 
     # Proceed as before…
     messages = [SystemMessage(content=system_prompt)]
@@ -158,7 +168,7 @@ async def chat_with_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content= f"{req_obj.message}; Here is text extracted from pdf {pdf_text}"))
+    messages.append(HumanMessage(content= f"{req_obj.message}; Here is text extracted from pdf, generate notes from this: \n{pdf_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
@@ -180,7 +190,7 @@ async def chat_with_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
 
 # === Route for image note generation === #
 @app.post("/studybuddy/process-image")
-async def extract_image_text(req: str = Form(...) , image: UploadFile = File(...)):
+async def process_image(req: str = Form(...) , image: UploadFile = File(...)):
 
     # Parse JSON string
     req_dict = json.loads(req)
@@ -190,7 +200,10 @@ async def extract_image_text(req: str = Form(...) , image: UploadFile = File(...
     image_bytes = await image.read()
 
     # Call processing
-    image_text = extract_image_text(image_bytes)
+    image_text = await extract_image_text(image_bytes)
+
+    if image_text:
+        logging.info(f"Extracted text length: {len(image_text)}")
 
     # Proceed as before…
     messages = [SystemMessage(content=system_prompt)]
@@ -202,7 +215,7 @@ async def extract_image_text(req: str = Form(...) , image: UploadFile = File(...
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content=  f"{req_obj.message}; Here is text extracted from image {image_text}"))
+    messages.append(HumanMessage(content=  f"{req_obj.message}; Here is text extracted from image, generate notes from this: \n{image_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
@@ -224,7 +237,7 @@ async def extract_image_text(req: str = Form(...) , image: UploadFile = File(...
 
 # === Route for yt note generation === #
 @app.post("/studybuddy/process-yt")
-async def extract_yt_transcript(req: ChatRequest):
+async def process_yt(req: ChatRequest):
 
     system_prompt = """
         Situation: You are an advanced AI note-taking assistant specializing in generating comprehensive, structured notes from YouTube video content. Your primary function is to transform video transcripts into clear, organized, and insightful notes that capture the key information effectively.
@@ -242,9 +255,12 @@ async def extract_yt_transcript(req: ChatRequest):
                 - Markdown or outline format for easy readability
 
         Objective: Create high-quality, actionable notes that allow readers to quickly understand the video's core content, key learnings, and most significant insights without watching the entire video.
+
+        Additional Guidelines:
+            Use tool `transcribe_yt` to get youtube transcribe 
     """
     
-    # 
+    # adding system prompt to message
     messages = [SystemMessage(content=system_prompt)]
 
     for msg in req.history:
@@ -276,22 +292,26 @@ async def extract_yt_transcript(req: ChatRequest):
 
 # === Route for audio summaries === #
 @app.post("/studybuddy/process-audio")
-async def transcribe_audio(req: str = Form(...), audio: UploadFile = File(...)):
+async def process_audio(req: str = Form(...), audio: UploadFile = File(...)):
     """
     Accepts a JSON string in `req` + uploaded audio file.
     """
     # Parse req
     try:
-        req_dict = json.loads(req)
+        req = json.loads(req)
+        print(req)
     except Exception as e:
-        return {"error": f"Invalid JSON in req: {e}"}
+        return {"error": f"Invalid JSON in req: {e}, \nTraceback: {traceback.format_exc()}"}
 
     # Save the uploaded audio file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
         tmp.write(await audio.read())
         tmp_path = tmp.name
 
-    image_text = transcribe_audio_file(tmp_path)
+    audio_text = await transcribe_audio_file(tmp_path)
+
+    if audio_text:
+        logging.info(f"Extract text length: {len(audio_text)}")
 
     # system prompt for conversation summary
     system_prompt = """
@@ -300,19 +320,23 @@ async def transcribe_audio(req: str = Form(...), audio: UploadFile = File(...)):
     Task: Analyze and distill the provided conversation into a concise, comprehensive summary that captures the key points, main ideas, and critical insights without losing the essential context or nuance.
 
     Objective: Produce a summary that allows readers to quickly understand the core content, intent, and outcomes of the conversation with minimal time investment.
+
+    Additional Guidelines:
+        You don't need to call any tool for this to extract the text from audio.
     """
 
     # Proceed as before…
     messages = [SystemMessage(content=system_prompt)]
 
-    for msg in req.history:
-        if msg.role == "human":
-            messages.append(HumanMessage(content=msg.content))
-        elif msg.role == "ai":
-            messages.append(AIMessage(content=msg.content))
+    if req.get("history", []):
+        for msg in req.history:
+            if msg.role == "human":
+                messages.append(HumanMessage(content=msg.content))
+            elif msg.role == "ai":
+                messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content= f"{req.message}; Here is text extracted from image {image_text}"))
+    messages.append(HumanMessage(content= f"{req.get('message', '')}; Provide a summary for this text extracted from audio: \n{audio_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
@@ -338,7 +362,7 @@ async def roadmap(req: ChatRequest):
     """
     Accepts a JSON string in `req` and suggest career roadmap
     """
-    
+
     # add system prompt to messages
     messages = [SystemMessage(content=career_system_prompt)]
 
@@ -354,7 +378,7 @@ async def roadmap(req: ChatRequest):
 
     # Run LangGraph
     state = {"messages": messages}
-    result = graph.invoke(state)
+    result = career_graph.invoke(state)
 
     # Get bot reply
     bot_reply = result["messages"][-1].content
