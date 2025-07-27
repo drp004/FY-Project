@@ -61,7 +61,7 @@ system_prompt = """
         Concise explanations
 
     Additional Guidelines:
-        You don't need to call any tool for this to extract the text from PDF or Image
+        You don't need to call any tool for extract the text from PDF or Image
 """
 
 class ChatHistoryItem(BaseModel):
@@ -168,7 +168,7 @@ async def process_pdf(req: str = Form(...), pdf: UploadFile = File(None)):
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content= f"{req_obj.message}; Here is text extracted from pdf, generate notes from this: \n{pdf_text}"))
+    messages.append(HumanMessage(content= f"{req_obj.message}; Here is extracted text from pdf, generate notes from this: \n{pdf_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
@@ -215,7 +215,7 @@ async def process_image(req: str = Form(...) , image: UploadFile = File(...)):
             messages.append(AIMessage(content=msg.content))
 
     # Add latest human message
-    messages.append(HumanMessage(content=  f"{req_obj.message}; Here is text extracted from image, generate notes from this: \n{image_text}"))
+    messages.append(HumanMessage(content=  f"{req_obj.message}; Here is extracted text from image, generate notes from this: \n{image_text}"))
 
     # Run LangGraph
     state = {"messages": messages}
